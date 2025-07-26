@@ -20,12 +20,12 @@ impl FaissIndex {
     pub fn insert_vectors(
         &self,
         data: &[f32],
-        label: Idx, 
+        label: u64, 
     ) -> Result<()> {
         self.index
             .lock()
             .unwrap()
-            .add_with_ids(data, &[label])
+            .add_with_ids(data, &[Idx::new(label)])
     }
 
     // Search for the k nearest neighbors of the query vector
@@ -53,6 +53,8 @@ impl FaissIndex {
 mod tests {
     use std::thread::JoinHandle;
 
+    use log::warn;
+
     use super::*;
     #[test] 
     fn test_faiss_workflow(){
@@ -60,7 +62,7 @@ mod tests {
         let faiss_index = FaissIndex::new(Box::new(index));
 
         let vectors = vec![1.0;128]; 
-        let label: Idx = Idx::new(1);
+        let label: u64 = 1;
 
         faiss_index.insert_vectors(&vectors, label).unwrap();
 
@@ -69,10 +71,51 @@ mod tests {
 
         assert_eq!(faiss_index.dim(), 128);
         
-        println!("search_result: {:#?}", search_result);
-        
-        assert_eq!(search_result.labels[0], label);
+        assert_eq!(search_result.labels[0], Idx::new(label));
         assert!(search_result.distances[0] < 0.001);
+    }
+
+    #[test] 
+    fn test_faiss_index_search() {
+        env_logger::Builder::new() 
+            .filter_level(log::LevelFilter::Debug)
+            .init();
+
+        let index = faiss::index_factory(128, "IDMap,Flat", faiss::MetricType::L2).unwrap();
+        let faiss_index = FaissIndex::new(Box::new(index));
+
+        let query = vec![1.0;128];
+        let search_result = faiss_index.search_vectors(&query, 1);
+        warn!("search_result: {:#?}", search_result);
+        assert!(search_result.is_err());
+    }
+
+    #[test] 
+    fn test_faiss_index_search_dim() {
+        let index = faiss::index_factory(128, "IDMap,Flat", faiss::MetricType::L2).unwrap();
+        let faiss_index = FaissIndex::new(Box::new(index));
+
+        let vectors = vec![1.0;256]; 
+        let label: u64 = 1;
+
+        eprintln!("dim: {}", faiss_index.dim());
+        eprintln!("Error inserting vectors: {:?}", faiss_index.insert_vectors(&vectors, label).err());
+
+        // assert!(faiss_index.insert_vectors(&vectors, label).is_err());
+
+        let search_result = faiss_index.search_vectors(&vec![1.0;128], 2).unwrap();
+
+        eprintln!("search_result: {:#?}", search_result);
+
+
+
+        // let query = vec![1.0;128];
+        // let search_result = faiss_index.search_vectors(&query, 1).unwrap(); 
+
+        // assert_eq!(faiss_index.dim(), 128);
+        
+        // assert_eq!(search_result.labels[0], Idx::new(label));
+        // assert!(search_result.distances[0] < 0.001);
     }
 
     #[test] 
@@ -82,7 +125,7 @@ mod tests {
         let index = faiss::index_factory(128, "IDMap,Flat", faiss::MetricType::L2).unwrap();
         let faiss_index = FaissIndex::new(Box::new(index));
 
-        let mut handles: Vec<JoinHandle<Idx>> = vec![];
+        let mut handles: Vec<JoinHandle<u64>> = vec![];
 
         for i in 0..10 {
             let index_clone = faiss_index.clone();
@@ -90,14 +133,14 @@ mod tests {
                 thread::sleep(Duration::from_millis(i * 10));
 
                 let vectors = vec![i as f32; 128];
-                let label = Idx::new(i as u64 + 1);
+                let label = i as u64 + 1;
 
                 index_clone.insert_vectors(&vectors, label).unwrap();
 
                 let query = vec![i as f32; 128];
                 let search_result = index_clone.search_vectors(&query, 1).unwrap();
                 
-                assert_eq!(search_result.labels[0], label);
+                assert_eq!(search_result.labels[0], Idx::new(label));
                 assert!(search_result.distances[0] < 0.001);
                 label   
 
@@ -105,7 +148,7 @@ mod tests {
             handles.push(handle);
         }
 
-        let mut result: Vec<Idx> = vec![]; 
+        let mut result: Vec<u64> = vec![]; 
         for handle in handles {
             result.push(handle.join().unwrap());
         }
@@ -115,7 +158,7 @@ mod tests {
         for (i, &label) in result.iter().enumerate() {
             let query = vec![i as f32; 128];
             let search_result = faiss_index.search_vectors(&query, 1).unwrap();
-            assert_eq!(search_result.labels[0], label);
+            assert_eq!(search_result.labels[0], Idx::new(label));
         }
 
         
