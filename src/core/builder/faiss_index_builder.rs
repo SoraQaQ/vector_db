@@ -1,30 +1,6 @@
-use std::fmt::Error;
-
 use faiss::MetricType;
 
-use std::sync::Arc;
-use std::any::Any;
-
-use crate::faiss_index::FaissIndex;
-
-#[derive(Clone)]
-pub struct IndexHandle {
-    inner: Arc<dyn Any + Send + Sync> 
-}
-
-impl IndexHandle {
-    pub fn new<T: Any + Send + Sync>(inner: T) -> Self {
-        Self { inner: Arc::new(inner) }
-    }
-
-    pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
-        self.inner.as_ref().downcast_ref()
-    }
-}
-
-pub trait IndexBuilder: Send + Sync {
-    fn build(&self) -> Result<IndexHandle, Error>;
-}
+use crate::core::{builder::index_handle::{IndexBuilder, IndexHandle}, index::faiss_index::FaissIndex};
 
 
 pub struct FaissIndexBuilder {
@@ -44,12 +20,15 @@ impl Default for FaissIndexBuilder {
 }
 
 impl IndexBuilder for FaissIndexBuilder {
-    fn build(&self) -> Result<IndexHandle, Error> {
-        let index = faiss::index_factory(self.dim, self.descriptor.as_str(), self.metric_type);
-        if index.is_err() {
-            return Err(Error);
-        }
-        let index = FaissIndex::new(Box::new(index.unwrap()));
+    fn build(&self) -> anyhow::Result<IndexHandle> {
+        let index = faiss::index_factory(
+            self.dim, 
+            self.descriptor.as_str(), 
+            self.metric_type
+        ).expect("failed to create index");
+
+        let index = FaissIndex::new(Box::new(index));
+
         Ok(IndexHandle::new(index))
     }
 }
