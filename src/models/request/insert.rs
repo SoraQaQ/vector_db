@@ -1,7 +1,7 @@
 use serde::{Deserialize};
 use validator::Validate;
 
-use crate::core::index_factory::IndexType;
+use crate::core::index_factory::{IndexKey};
 
 
 #[derive(Debug, Deserialize, Validate)] 
@@ -14,6 +14,6 @@ pub struct InsertRequest {
     #[validate(range(min = 0, message = "label must be at least 0"))]
     pub label: Option<u64>,
     
-    #[validate(required(message = "index_type cannot be empty"))]
-    pub index_type: Option<IndexType>,
+    #[validate(required(message = "index_key cannot be empty"))]
+    pub index_key: Option<IndexKey>,
 }

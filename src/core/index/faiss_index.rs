@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use faiss::MetricType;
 use faiss::{index::SearchResult, Idx, Index, error::Result}; 
 
 #[derive(Clone)]
@@ -46,6 +47,10 @@ impl FaissIndex {
             .lock()
             .unwrap()
             .d()
+    }
+
+    pub fn metric_type(&self) -> MetricType {
+        self.index.lock().unwrap().metric_type()
     }
 }
 
