@@ -19,4 +19,4 @@ impl IndexHandle {
 
 pub trait IndexBuilder: Send + Sync {
     fn build(&self) -> Result<IndexHandle>;
-}
+}   

@@ -37,17 +37,17 @@ pub async fn search_handler(
     
     info!("search_handler: {:?}", payload);
 
-    let (index_type, query, k) = (payload.index_type.unwrap(), payload.query.unwrap(), payload.k.unwrap());
+    let (index_key, query, k) = (payload.index_key.unwrap(), payload.query.unwrap(), payload.k.unwrap());
 
     let index_factory = global_index_factory();
     
     let index = index_factory
-        .get_index(index_type)
+        .get_index(index_key)
         .ok_or_else(
-            || AppError::UnsupportedIndexType(index_type)
+            || AppError::UnsupportedIndexType(index_key)
         )?; 
 
-    let search_result: SearchResult = match index_type {
+    let search_result: SearchResult = match index_key.index_type {
         IndexType::FLAT => {
             let result = index.downcast_ref::<FaissIndex>().unwrap()
                 .search_vectors(&query, k)
@@ -57,7 +57,7 @@ pub async fn search_handler(
 
             Ok::<SearchResult, AppError>(search_result)
         }, 
-        _ => return Err(AppError::UnsupportedIndexType(index_type)),
+        _ => return Err(AppError::UnsupportedIndexType(index_key)),
     }?;
 
     Ok(Json(SearchResponse{
@@ -74,6 +74,8 @@ mod tests {
     use axum::{body::{to_bytes, Body}, http::{Request, StatusCode}, Router};
     use tower::Service;
     use rstest::*;
+    use crate::core::index_factory::{IndexKey, MyMetricType};
+
     use super::*;
     
 
@@ -82,7 +84,7 @@ mod tests {
             .route("/search", axum::routing::post(search_handler))
     }
 
-    fn setup_search_json(query: Vec<f32>, k: usize, index_type: IndexType) -> Request<Body> {
+    fn setup_search_json(query: Vec<f32>, k: usize, index_key: IndexKey) -> Request<Body> {
         Request::builder()
             .uri("/search")
             .method("POST")
@@ -91,31 +93,33 @@ mod tests {
                 serde_json::json!({
                     "query": query,
                     "k": k,
-                    "index_type": index_type
+                    "index_key": index_key
                 }).to_string(),
             ))
             .unwrap()
     }
     
     #[rstest]
-    #[case(vec![1.0, 2.0, 3.0], 3, IndexType::FLAT, StatusCode::NOT_FOUND)]
-    #[case(vec![0.5, 1.5, 2.5], 3, IndexType::UNKNOWN, StatusCode::NOT_FOUND)]
-    #[case(vec![], 1, IndexType::FLAT, StatusCode::BAD_REQUEST)]
+    #[case(vec![1.0, 2.0, 3.0], 3, IndexKey{index_type: IndexType::FLAT, dim: 3, metric_type: MyMetricType::L2}, StatusCode::NOT_FOUND)]
+    #[case(vec![0.5, 1.5, 2.5], 3, IndexKey{index_type: IndexType::UNKNOWN, dim: 3, metric_type: MyMetricType::L2}, StatusCode::NOT_FOUND)]
+    #[case(vec![], 1, IndexKey{index_type: IndexType::FLAT, dim: 3, metric_type: MyMetricType::L2}, StatusCode::BAD_REQUEST)]
     #[tokio::test] 
     async fn test_search_handler(
         #[case] query: Vec<f32>,
         #[case] k: usize,
-        #[case] index_type: IndexType,
+        #[case] index_key: IndexKey,
         #[case] expected_status: StatusCode,
     ) {
+        use crate::core::index_factory::MyMetricType;
+
         env_logger::Builder::new() 
             .filter_level(log::LevelFilter::Debug)
             .init();
         
         let factory = global_index_factory(); 
-        factory.init(IndexType::FLAT, 3, faiss::MetricType::L2);
+        factory.init(IndexType::FLAT, 3, MyMetricType::L2).unwrap();
 
-        let request = setup_search_json(query, k, index_type);
+        let request = setup_search_json(query, k, index_key);
 
         let mut app = setup_test_app();
         let response = app.call(request).await.unwrap(); 
@@ -138,11 +142,11 @@ mod tests {
             .init();
         
         let factory = global_index_factory(); 
-        factory.init(IndexType::FLAT, 3, faiss::MetricType::L2);
+        factory.init(IndexType::FLAT, 3, MyMetricType::L2).unwrap();
 
-        factory.get_index(IndexType::FLAT).unwrap().downcast_ref::<FaissIndex>().unwrap().insert_vectors(&vec![1.0, 2.0, 3.0], 1).unwrap();
+        factory.get_index(IndexKey{index_type: IndexType::FLAT, dim: 3, metric_type: MyMetricType::L2}).unwrap().downcast_ref::<FaissIndex>().unwrap().insert_vectors(&vec![1.0, 2.0, 3.0], 1).unwrap();
 
-        let request = setup_search_json(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 2, IndexType::FLAT);
+        let request = setup_search_json(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 2, IndexKey{index_type: IndexType::FLAT, dim: 3, metric_type: MyMetricType::L2});
 
         let mut app = setup_test_app();
         let response = app.call(request).await.unwrap(); 

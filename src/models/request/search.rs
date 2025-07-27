@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use validator::Validate;
-use crate::core::index_factory::IndexType;
+use crate::core::index_factory::{IndexKey};
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct SearchRequest {
@@ -13,6 +13,6 @@ pub struct SearchRequest {
     #[validate(range(min = 1, message = "k must be at least 1"))]
     pub k: Option<usize>,
     
-    #[validate(required(message = "index_type cannot be empty"))]
-    pub index_type: Option<IndexType>,
-}
+    #[validate(required(message = "index_key cannot be empty"))]
+    pub index_key: Option<IndexKey>,
+}   

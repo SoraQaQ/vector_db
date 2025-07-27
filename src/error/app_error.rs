@@ -1,7 +1,7 @@
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use thiserror::Error;
 
-use crate::core::index_factory::IndexType;
+use crate::core::index_factory::{IndexKey};
 
 #[derive(Debug, Error)]
 pub enum AppError {
@@ -18,7 +18,10 @@ pub enum AppError {
     IndexNotFound(String),
     
     #[error("Unsupported index type: {0}")]
-    UnsupportedIndexType(IndexType),
+    UnsupportedIndexType(IndexKey),
+
+    #[error("Init {0} index error: {1}")]
+    InitIndexError(IndexKey, String),
 }
 
 impl IntoResponse for AppError {

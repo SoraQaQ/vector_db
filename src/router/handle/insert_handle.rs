@@ -13,15 +13,15 @@ pub async fn insert_handler(
 
     info!("insert_handler: {:?}", payload);
 
-    let (index_type, vector, label) = (payload.index_type.unwrap(), payload.vector.unwrap(), payload.label.unwrap());
+    let (index_key, vector, label) = (payload.index_key.unwrap(), payload.vector.unwrap(), payload.label.unwrap());
 
     let index_factory = global_index_factory(); 
     
     let index = index_factory
-        .get_index(index_type)
-        .ok_or_else(|| AppError::UnsupportedIndexType(index_type))?; 
+        .get_index(index_key)
+        .ok_or_else(|| AppError::UnsupportedIndexType(index_key))?; 
 
-    match index_type {
+    match index_key.index_type {
         IndexType::FLAT => {
             let faiss_index = index.downcast_ref::<FaissIndex>().unwrap();
 
@@ -31,7 +31,7 @@ pub async fn insert_handler(
                     |e| AppError::FaissError(e)
                 )?;
         }, 
-        _ => return Err(AppError::UnsupportedIndexType(index_type)),
+        _ => return Err(AppError::UnsupportedIndexType(index_key)),
     };
 
     Ok(Json(InsertResponse{
@@ -42,6 +42,8 @@ pub async fn insert_handler(
 
 #[cfg(test)]
 mod tests {
+    use crate::core::index_factory::{IndexKey, MyMetricType};
+
     use super::*;
     use axum::{body::{to_bytes, Body}, http::{Request, StatusCode}, Router};
     use rstest::*; 
@@ -52,7 +54,7 @@ mod tests {
              .route("/insert", axum::routing::post(insert_handler))
      }
 
-     fn setup_insert_json(vector: Vec<f32>, label: u64, index_type: IndexType) -> Request<Body> {
+     fn setup_insert_json(vector: Vec<f32>, label: u64, index_key: IndexKey) -> Request<Body> {
         Request::builder()
             .uri("/insert")
             .method("POST")
@@ -61,18 +63,18 @@ mod tests {
                 serde_json::json!({
                     "vector": vector,
                     "label": label,
-                    "index_type": index_type
+                    "index_key": index_key
                 }).to_string(),
             ))
             .unwrap()
     }
 
     #[rstest]
-    #[case(IndexType::FLAT, vec![1.0, 2.0, 3.0], 1, StatusCode::OK)]
-    #[case(IndexType::UNKNOWN, vec![1.0, 2.0, 3.0], 1, StatusCode::NOT_FOUND)]
+    #[case(IndexKey{index_type: IndexType::FLAT, dim: 3, metric_type: MyMetricType::L2}, vec![1.0, 2.0, 3.0], 1, StatusCode::OK)]
+    #[case(IndexKey{index_type: IndexType::UNKNOWN, dim: 3, metric_type: MyMetricType::L2}, vec![1.0, 2.0, 3.0], 1, StatusCode::NOT_FOUND)]
     #[tokio::test] 
     async fn test_insert_handler(
-        #[case] index_type: IndexType,
+        #[case] index_key: IndexKey,
         #[case] vector: Vec<f32>,
         #[case] label: u64,
         #[case] expected_status: StatusCode,
@@ -82,9 +84,9 @@ mod tests {
             .init();
         
         let factory = global_index_factory(); 
-        factory.init(index_type, 3, faiss::MetricType::L2);
+        factory.init(index_key.index_type, index_key.dim, index_key.metric_type).unwrap();
 
-        let request = setup_insert_json(vector, label, index_type);
+        let request = setup_insert_json(vector, label, index_key);
 
         let mut app = setup_test_app();
         let response = app.call(request).await.unwrap(); 
