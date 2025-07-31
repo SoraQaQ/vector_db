@@ -91,9 +91,9 @@ mod tests {
 
         let hnsw_index = handler.downcast_ref::<HnswIndex<f32>>().unwrap();
 
-        hnsw_index.insert_vectors(&[1.0; 10], 1);
+        hnsw_index.insert_vectors(&[1.0; 10], 1).unwrap();
 
-        let (indices, distances) = hnsw_index.search_vectors(&[1.0; 10], 1, 10);
+        let (indices, distances) = hnsw_index.search_vectors(&[1.0; 10], 1, 10).unwrap();
         
         assert_eq!(indices.len(), 1);
         assert_eq!(distances.len(), 1);

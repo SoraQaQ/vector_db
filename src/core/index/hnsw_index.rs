@@ -1,5 +1,6 @@
 use hnsw_rs::api::AnnT;
 use std::sync::{Arc, Mutex};
+use anyhow::Result;
 
 pub struct HnswIndex<T: Clone + Send + Sync> {
     index: Arc<Mutex<Box<dyn AnnT<Val = T> + Send>>>,
@@ -11,11 +12,12 @@ impl<T: Clone + Send + Sync> HnswIndex<T> {
         Self { index: Arc::new(Mutex::new(index)) }
     }
 
-    pub fn insert_vectors(&self, data: &[T], label: usize) {
+    pub fn insert_vectors(&self, data: &[T], label: usize) -> Result<()> {
         self.index.lock().unwrap().insert_data(data, label);
+        Ok(())
     }
 
-    pub fn search_vectors(&self, query:&[T], k: usize, ef_s: usize) -> (Vec<usize>, Vec<f32>) {
+    pub fn search_vectors(&self, query:&[T], k: usize, ef_s: usize) -> Result<(Vec<usize>, Vec<f32>)> {
         let result = self.index.lock().unwrap().search_neighbours(query, k, ef_s);
 
         let (indices, distances): (Vec<usize>, Vec<f32>) = result
@@ -23,7 +25,7 @@ impl<T: Clone + Send + Sync> HnswIndex<T> {
             .map(|x| (x.get_origin_id(), x.get_distance()))
             .unzip();
 
-        (indices, distances)
+        Ok((indices, distances))
     }
 }
 
@@ -38,9 +40,9 @@ mod tests {
         let hnsw_index = HnswIndex::new(Box::new(index));
 
         // hnsw_index.insert_vectors(&[1.0; 10], 1);
-        hnsw_index.insert_vectors(&[2.0; 30], 2);
+        hnsw_index.insert_vectors(&[2.0; 30], 2).unwrap();
 
-        let (indices, distances) = hnsw_index.search_vectors(&[1.0; 10], 1, 10);
+        let (indices, distances) = hnsw_index.search_vectors(&[1.0; 10], 1, 10).unwrap();
         
         println!("indices: {:?}", indices);
         println!("distances: {:?}", distances);
