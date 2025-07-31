@@ -46,7 +46,7 @@ pub async fn create_handler(
 
 #[cfg(test)]
 mod tests {
-    use axum::{body::{to_bytes, Body}, http::{request, Request, StatusCode}, routing::Router};
+    use axum::{body::{to_bytes, Body}, http::{Request, StatusCode}, routing::Router};
 
     use crate::{core::index_factory::{IndexType, MetricType}, router::handle::create_index_handle::create_handler};
     use rstest::*;
@@ -132,13 +132,13 @@ mod tests {
             .filter_level(log::LevelFilter::Debug)
             .init();
         
-        let request = setup_create_json(IndexType::HNSW, 128, MetricType::L2);
+        let request = setup_create_hnsw_json(IndexType::HNSW, 128, MetricType::L2, 1000);
 
         let mut app = app();
         let response = app.call(request).await.unwrap(); 
 
         info!("response: {:?}", response);
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(response.status(), StatusCode::OK);
 
         let body = to_bytes(response.into_body(), 1024).await.unwrap();
         let body_str = String::from_utf8_lossy(&body);

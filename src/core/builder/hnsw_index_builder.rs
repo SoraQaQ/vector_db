@@ -1,4 +1,4 @@
-use crate::core::{builder::index_handle::{IndexBuilder, IndexHandle}, index::hnsw_index::HnswIndex, index_factory::MetricType};
+use crate::core::{builder::index_handle::{IndexBuilder, IndexHandle}, index::hnsw_index::HnswIndex};
 use anyhow::Result;
 use hnsw_rs::{anndists::dist::{Distance}, hnsw::Hnsw};
 use serde::{de::DeserializeOwned, Serialize};
