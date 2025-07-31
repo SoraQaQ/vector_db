@@ -37,7 +37,15 @@ pub async fn search_handler(
     
     info!("search_handler: {:?}", payload);
 
-    let (index_key, query, k) = (payload.index_key.unwrap(), payload.query.unwrap(), payload.k.unwrap());
+    let (
+        index_key,
+        query, 
+        k
+    ) = (
+        payload.index_key.unwrap(), 
+        payload.query.unwrap(), 
+        payload.k.unwrap()
+    );
 
     let index_factory = global_index_factory();
     
@@ -51,7 +59,9 @@ pub async fn search_handler(
         IndexType::FLAT => {
             let result = index.downcast_ref::<FaissIndex>().unwrap()
                 .search_vectors(&query, k)
-                .map_err(|e| AppError::FaissError(e))?;
+                .map_err(
+                    |e| AppError::FaissError(e)
+                )?;
             
             let search_result = SearchResult::from_faiss(result)?;
 
@@ -74,7 +84,7 @@ mod tests {
     use axum::{body::{to_bytes, Body}, http::{Request, StatusCode}, Router};
     use tower::Service;
     use rstest::*;
-    use crate::core::index_factory::{IndexKey, MyMetricType};
+    use crate::core::index_factory::{IndexKey, MetricType};
 
     use super::*;
     
@@ -100,9 +110,9 @@ mod tests {
     }
     
     #[rstest]
-    #[case(vec![1.0, 2.0, 3.0], 3, IndexKey{index_type: IndexType::FLAT, dim: 3, metric_type: MyMetricType::L2}, StatusCode::NOT_FOUND)]
-    #[case(vec![0.5, 1.5, 2.5], 3, IndexKey{index_type: IndexType::UNKNOWN, dim: 3, metric_type: MyMetricType::L2}, StatusCode::NOT_FOUND)]
-    #[case(vec![], 1, IndexKey{index_type: IndexType::FLAT, dim: 3, metric_type: MyMetricType::L2}, StatusCode::BAD_REQUEST)]
+    #[case(vec![1.0, 2.0, 3.0], 3, IndexKey{index_type: IndexType::FLAT, dim: 3, metric_type: MetricType::L2}, StatusCode::NOT_FOUND)]
+    #[case(vec![0.5, 1.5, 2.5], 3, IndexKey{index_type: IndexType::UNKNOWN, dim: 3, metric_type: MetricType::L2}, StatusCode::NOT_FOUND)]
+    #[case(vec![], 1, IndexKey{index_type: IndexType::FLAT, dim: 3, metric_type: MetricType::L2}, StatusCode::BAD_REQUEST)]
     #[tokio::test] 
     async fn test_search_handler(
         #[case] query: Vec<f32>,
@@ -110,14 +120,12 @@ mod tests {
         #[case] index_key: IndexKey,
         #[case] expected_status: StatusCode,
     ) {
-        use crate::core::index_factory::MyMetricType;
-
         env_logger::Builder::new() 
             .filter_level(log::LevelFilter::Debug)
             .init();
         
         let factory = global_index_factory(); 
-        factory.init(IndexType::FLAT, 3, MyMetricType::L2).unwrap();
+        factory.init(IndexType::FLAT, 3, 1000, MetricType::L2).unwrap();
 
         let request = setup_search_json(query, k, index_key);
 
@@ -142,11 +150,11 @@ mod tests {
             .init();
         
         let factory = global_index_factory(); 
-        factory.init(IndexType::FLAT, 3, MyMetricType::L2).unwrap();
+        factory.init(IndexType::FLAT, 3, 1000, MetricType::L2).unwrap();
 
-        factory.get_index(IndexKey{index_type: IndexType::FLAT, dim: 3, metric_type: MyMetricType::L2}).unwrap().downcast_ref::<FaissIndex>().unwrap().insert_vectors(&vec![1.0, 2.0, 3.0], 1).unwrap();
+        factory.get_index(IndexKey{index_type: IndexType::FLAT, dim: 3, metric_type: MetricType::L2}).unwrap().downcast_ref::<FaissIndex>().unwrap().insert_vectors(&vec![1.0, 2.0, 3.0], 1).unwrap();
 
-        let request = setup_search_json(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 2, IndexKey{index_type: IndexType::FLAT, dim: 3, metric_type: MyMetricType::L2});
+        let request = setup_search_json(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 2, IndexKey{index_type: IndexType::FLAT, dim: 3, metric_type: MetricType::L2});
 
         let mut app = setup_test_app();
         let response = app.call(request).await.unwrap(); 

@@ -92,7 +92,7 @@ mod tests {
         let query = vec![1.0;128];
         let search_result = faiss_index.search_vectors(&query, 1);
         warn!("search_result: {:#?}", search_result);
-        assert!(search_result.is_err());
+        assert!(search_result.is_ok());
     }
 
     #[test] 

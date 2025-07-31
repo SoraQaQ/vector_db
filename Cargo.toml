@@ -17,3 +17,4 @@ validator = { version = "0.16", features = ["derive"] }
 tower = "0.4"
 hyper = "0.14"
 rstest = "0.22.0"
+hnsw_rs = "0.3.2"
