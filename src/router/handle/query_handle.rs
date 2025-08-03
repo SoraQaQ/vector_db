@@ -7,7 +7,6 @@ use crate::{
     error::app_error::AppError,
     models::{request::query::QueryRequest, response::query::QueryResponse},
 };
-use tower::Service;
 use validator::Validate;
 
 pub async fn query_handle(
@@ -42,7 +41,7 @@ mod tests {
         routing::post,
     };
 
-    use crate::core::index_factory::IndexKey;
+    use tower::Service;
 
     use super::*;
 
