@@ -1,3 +1,5 @@
+use std::str::from_utf8;
+
 use anyhow::Result;
 use rocksdb::DB;
 pub struct ScalarStorage {
@@ -15,7 +17,7 @@ impl ScalarStorage {
         let id = id.to_string();
 
         self.db.get(&id).ok()?.and_then(|bytes| {
-            std::str::from_utf8(&bytes)
+            from_utf8(&bytes)
                 .ok()
                 .and_then(|s| serde_json::from_str(s).ok())
         })
