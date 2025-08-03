@@ -12,11 +12,13 @@ impl ScalarStorage {
     }
 
     pub fn get_scalar(&self, id: u64) -> Option<serde_json::Value> {
-        let data = self.db.get(id.to_string()).ok()?;
-        let data = data.ok_or_else(|| anyhow::anyhow!("Key not found")).ok()?;
-        let data = String::from_utf8(data).ok()?;
-        let data = serde_json::from_str(&data).ok()?;
-        Some(data)
+        let id = id.to_string();
+
+        self.db.get(&id).ok()?.and_then(|bytes| {
+            std::str::from_utf8(&bytes)
+                .ok()
+                .and_then(|s| serde_json::from_str(s).ok())
+        })
     }
 }
 

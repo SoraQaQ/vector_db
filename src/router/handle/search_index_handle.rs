@@ -4,7 +4,7 @@ use validator::Validate;
 
 use crate::{
     core::{
-        index::faiss_index::FaissIndex,
+        index::{faiss_index::FaissIndex, hnsw_index::HnswIndex},
         index_factory::{IndexType, global_index_factory},
     },
     error::app_error::AppError,
@@ -29,6 +29,14 @@ impl SearchResult {
             distances: result.distances,
         })
     }
+
+    pub fn from_hnsw(result: (Vec<usize>, Vec<f32>)) -> Result<Self, AppError> {
+        let labels = result.0.iter().map(|x| *x as i64).collect::<Vec<i64>>();
+        Ok(SearchResult {
+            labels,
+            distances: result.1,
+        })
+    }
 }
 
 pub async fn search_handler(
@@ -50,7 +58,7 @@ pub async fn search_handler(
 
     let index = index_factory
         .get_index(index_key)
-        .ok_or_else(|| AppError::UnsupportedIndexType(index_key))?;
+        .ok_or_else(|| AppError::IndexNotFound(format!("{:?} index not found", index_key)))?;
 
     let search_result: SearchResult = match index_key.index_type {
         IndexType::FLAT => {
@@ -60,12 +68,18 @@ pub async fn search_handler(
                 .search_vectors(&vectors, k)
                 .map_err(|e| AppError::FaissError(e))?;
 
-            let search_result = SearchResult::from_faiss(result)?;
+            SearchResult::from_faiss(result)?
+        }
+        IndexType::HNSW => {
+            let hnsw_index = index.downcast_ref::<HnswIndex<f32>>().unwrap();
+            let result = hnsw_index
+                .search_vectors(&vectors, k, 200)
+                .map_err(|e| AppError::HnswError(e.to_string()))?;
 
-            Ok::<SearchResult, AppError>(search_result)
+            SearchResult::from_hnsw(result)?
         }
         _ => return Err(AppError::UnsupportedIndexType(index_key)),
-    }?;
+    };
 
     Ok(Json(SearchResponse {
         code: 0,
@@ -151,17 +165,17 @@ mod tests {
 
         let factory = global_index_factory();
         factory
-            .init(IndexType::FLAT, 3, 1000, MetricType::L2)
+            .init(IndexType::HNSW, 3, 1000, MetricType::L2)
             .unwrap();
 
         factory
             .get_index(IndexKey {
-                index_type: IndexType::FLAT,
+                index_type: IndexType::HNSW,
                 dim: 3,
                 metric_type: MetricType::L2,
             })
             .unwrap()
-            .downcast_ref::<FaissIndex>()
+            .downcast_ref::<HnswIndex<f32>>()
             .unwrap()
             .insert_vectors(&vec![1.0, 2.0, 3.0], 1)
             .unwrap();
@@ -170,7 +184,7 @@ mod tests {
             vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
             2,
             IndexKey {
-                index_type: IndexType::FLAT,
+                index_type: IndexType::HNSW,
                 dim: 3,
                 metric_type: MetricType::L2,
             },
