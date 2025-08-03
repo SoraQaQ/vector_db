@@ -55,7 +55,7 @@ mod tests {
     use axum::{
         body::{Body, to_bytes},
         http::{Request, StatusCode},
-        routing::Router,
+        routing::{Router, post},
     };
 
     use crate::{
@@ -110,7 +110,7 @@ mod tests {
     }
 
     fn app() -> Router {
-        axum::Router::new().route("/insert", axum::routing::post(create_handler))
+        axum::Router::new().route("/insert", post(create_handler))
     }
 
     #[rstest]

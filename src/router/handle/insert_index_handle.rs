@@ -63,12 +63,13 @@ mod tests {
         Router,
         body::{Body, to_bytes},
         http::{Request, StatusCode},
+        routing::post,
     };
     use rstest::*;
     use tower::Service;
 
     fn setup_test_app() -> Router {
-        axum::Router::new().route("/insert", axum::routing::post(insert_handler))
+        axum::Router::new().route("/insert", post(insert_handler))
     }
 
     fn setup_insert_json(vectors: Vec<f32>, id: u64, index_key: IndexKey) -> Request<Body> {

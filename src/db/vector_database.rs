@@ -22,6 +22,7 @@ impl VectorDatabase {
     }
 
     pub fn upsert(&self, id: u64, data: serde_json::Value, index_key: IndexKey) -> Result<()> {
+        info!("upsert data: {:?}", data);
         let index = global_index_factory()
             .get_index(index_key)
             .ok_or_else(|| anyhow::anyhow!("index not found"))?;
@@ -53,6 +54,8 @@ impl VectorDatabase {
                     .ok_or_else(|| anyhow::anyhow!("vector element is not a number"))
             })
             .collect::<Result<Vec<f32>>>()?;
+
+        info!("upsert new vectors: {:?}", new_vectors);
 
         match index_key.index_type {
             IndexType::FLAT => {

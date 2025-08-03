@@ -45,6 +45,7 @@ pub async fn upsert_handle(
 
 #[cfg(test)]
 mod tests {
+    use axum::routing::post;
     use axum::{Router, body::Body, http::Request};
     use std::sync::Arc;
 
@@ -57,9 +58,9 @@ mod tests {
     use super::*;
 
     fn setup_test_app() -> Router {
-        let vector_database = Arc::new(VectorDatabase::new("your_db_path".to_string()));
+        let vector_database = Arc::new(VectorDatabase::new("test".to_string()));
         let app = axum::Router::new()
-            .route("/upsert", axum::routing::post(upsert_handle))
+            .route("/upsert", post(upsert_handle))
             .with_state(vector_database.clone());
         app
     }

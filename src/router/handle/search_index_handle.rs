@@ -82,6 +82,7 @@ mod tests {
         Router,
         body::{Body, to_bytes},
         http::{Request, StatusCode},
+        routing::post,
     };
     use rstest::*;
     use tower::Service;
@@ -89,7 +90,7 @@ mod tests {
     use super::*;
 
     fn setup_test_app() -> Router {
-        axum::Router::new().route("/search", axum::routing::post(search_handler))
+        axum::Router::new().route("/search", post(search_handler))
     }
 
     fn setup_search_json(vectors: Vec<f32>, k: usize, index_key: IndexKey) -> Request<Body> {

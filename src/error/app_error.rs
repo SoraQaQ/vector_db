@@ -1,7 +1,7 @@
 use axum::{Json, http::StatusCode, response::IntoResponse};
 use thiserror::Error;
 
-use crate::{core::index_factory::IndexKey, error};
+use crate::core::index_factory::IndexKey;
 
 #[derive(Debug, Error)]
 pub enum AppError {
