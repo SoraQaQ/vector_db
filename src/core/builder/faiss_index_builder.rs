@@ -1,18 +1,20 @@
 use faiss::MetricType;
 
-use crate::core::{builder::index_handle::{IndexBuilder, IndexHandle}, index::faiss_index::FaissIndex};
-
+use crate::core::{
+    builder::index_handle::{IndexBuilder, IndexHandle},
+    index::faiss_index::FaissIndex,
+};
 
 pub struct FaissIndexBuilder {
     descriptor: String,
     metric_type: MetricType,
-    dim: u32, 
+    dim: u32,
 }
 
 impl Default for FaissIndexBuilder {
     fn default() -> Self {
         Self {
-            descriptor: String::new(), 
+            descriptor: String::new(),
             metric_type: MetricType::L2,
             dim: 0,
         }
@@ -21,11 +23,8 @@ impl Default for FaissIndexBuilder {
 
 impl IndexBuilder for FaissIndexBuilder {
     fn build(&self) -> anyhow::Result<IndexHandle> {
-        let index = faiss::index_factory(
-            self.dim, 
-            self.descriptor.as_str(), 
-            self.metric_type
-        ).expect("failed to create index");
+        let index = faiss::index_factory(self.dim, self.descriptor.as_str(), self.metric_type)
+            .expect("failed to create index");
 
         let index = FaissIndex::new(Box::new(index));
 
@@ -52,10 +51,10 @@ impl FaissIndexBuilder {
 
 #[cfg(test)]
 mod tests {
-    use super::*; 
-    
-    #[test] 
-    fn test_faiss_index_builder() { 
+    use super::*;
+
+    #[test]
+    fn test_faiss_index_builder() {
         let builder = FaissIndexBuilder::default()
             .description("IDMap,Flat")
             .metric_type(MetricType::L2)

@@ -1,15 +1,16 @@
+use anyhow::Result;
 use hnsw_rs::api::AnnT;
 use std::sync::{Arc, Mutex};
-use anyhow::Result;
 
 pub struct HnswIndex<T: Clone + Send + Sync> {
     index: Arc<Mutex<Box<dyn AnnT<Val = T> + Send>>>,
 }
 
 impl<T: Clone + Send + Sync> HnswIndex<T> {
-
     pub fn new(index: Box<dyn AnnT<Val = T> + Send>) -> Self {
-        Self { index: Arc::new(Mutex::new(index)) }
+        Self {
+            index: Arc::new(Mutex::new(index)),
+        }
     }
 
     pub fn insert_vectors(&self, data: &[T], label: usize) -> Result<()> {
@@ -17,7 +18,12 @@ impl<T: Clone + Send + Sync> HnswIndex<T> {
         Ok(())
     }
 
-    pub fn search_vectors(&self, query:&[T], k: usize, ef_s: usize) -> Result<(Vec<usize>, Vec<f32>)> {
+    pub fn search_vectors(
+        &self,
+        query: &[T],
+        k: usize,
+        ef_s: usize,
+    ) -> Result<(Vec<usize>, Vec<f32>)> {
         let result = self.index.lock().unwrap().search_neighbours(query, k, ef_s);
 
         let (indices, distances): (Vec<usize>, Vec<f32>) = result
@@ -33,26 +39,22 @@ impl<T: Clone + Send + Sync> HnswIndex<T> {
 mod tests {
     use super::*;
     use hnsw_rs::anndists::dist::DistL2;
-    #[test] 
+    #[test]
     fn test_hnsw_index() {
-      
-        let index = hnsw_rs::hnsw::Hnsw::<f32, DistL2>::new(10, 100, 16, 10, DistL2{});
+        let index = hnsw_rs::hnsw::Hnsw::<f32, DistL2>::new(10, 100, 16, 10, DistL2 {});
         let hnsw_index = HnswIndex::new(Box::new(index));
 
         // hnsw_index.insert_vectors(&[1.0; 10], 1);
         hnsw_index.insert_vectors(&[2.0; 30], 2).unwrap();
 
         let (indices, distances) = hnsw_index.search_vectors(&[1.0; 10], 1, 10).unwrap();
-        
+
         println!("indices: {:?}", indices);
         println!("distances: {:?}", distances);
-        
+
         assert_eq!(indices.len(), 1);
         assert_eq!(distances.len(), 1);
 
-
         // let (indices, distances) = hnsw_index.search_vectors(&[2.0; 10], 1, 10);
-        
-        
     }
 }

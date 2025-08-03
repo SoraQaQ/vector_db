@@ -1,33 +1,39 @@
-use crate::core::{builder::index_handle::{IndexBuilder, IndexHandle}, index::hnsw_index::HnswIndex};
+use crate::core::{
+    builder::index_handle::{IndexBuilder, IndexHandle},
+    index::hnsw_index::HnswIndex,
+};
 use anyhow::Result;
-use hnsw_rs::{anndists::dist::{Distance}, hnsw::Hnsw};
-use serde::{de::DeserializeOwned, Serialize};
+use hnsw_rs::{anndists::dist::Distance, hnsw::Hnsw};
+use serde::{Serialize, de::DeserializeOwned};
 
 #[derive(Default)]
-pub struct HnswIndexBuilder <T: Clone + Send + Sync + Serialize + DeserializeOwned + 'static, D: Distance<T> + 'static> {
+pub struct HnswIndexBuilder<
+    T: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
+    D: Distance<T> + 'static,
+> {
     max_nb_connection: usize,
     max_elements: usize,
-    max_layer: usize,   
+    max_layer: usize,
     ef_construction: usize,
-    data: T, 
-    space: D, 
+    data: T,
+    space: D,
 }
 
-impl<T, D> IndexBuilder for HnswIndexBuilder<T, D> 
+impl<T, D> IndexBuilder for HnswIndexBuilder<T, D>
 where
     T: Clone + Send + Sync + Serialize + DeserializeOwned,
-    D: Distance<T> + Send + Sync + Copy 
+    D: Distance<T> + Send + Sync + Copy,
 {
     fn build(&self) -> Result<IndexHandle> {
         let index: Hnsw<T, D> = Hnsw::new(
-            self.max_nb_connection,     
-            self.max_elements, 
-            self.max_layer, 
-            self.ef_construction, 
-            self.space, 
-        ); 
-        
-        let index = HnswIndex::new(Box::new(index)); 
+            self.max_nb_connection,
+            self.max_elements,
+            self.max_layer,
+            self.ef_construction,
+            self.space,
+        );
+
+        let index = HnswIndex::new(Box::new(index));
         Ok(IndexHandle::new(index))
     }
 }
@@ -68,16 +74,13 @@ where
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
-    use super::*; 
+    use super::*;
     use hnsw_rs::anndists::dist::DistL2;
-    
-    #[test] 
-    fn test_hnsw_index_builder() { 
 
+    #[test]
+    fn test_hnsw_index_builder() {
         let builder = HnswIndexBuilder::<f32, DistL2>::default()
             .max_nb_connection(16)
             .max_elements(1000)
@@ -94,7 +97,7 @@ mod tests {
         hnsw_index.insert_vectors(&[1.0; 10], 1).unwrap();
 
         let (indices, distances) = hnsw_index.search_vectors(&[1.0; 10], 1, 10).unwrap();
-        
+
         assert_eq!(indices.len(), 1);
         assert_eq!(distances.len(), 1);
     }
