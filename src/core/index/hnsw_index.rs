@@ -71,7 +71,7 @@ mod tests {
         let index = hnsw_rs::hnsw::Hnsw::<f32, DistL2>::new(10, 100, 16, 10, DistL2 {});
         let hnsw_index = HnswIndex::new(Box::new(index));
 
-        hnsw_index.insert_vectors(&[1.0; 10], 1);
+        hnsw_index.insert_vectors(&[1.0; 10], 1).unwrap();
         hnsw_index.insert_vectors(&[2.0; 30], 2).unwrap();
 
         let mut bitmap = RoaringBitmap::new();
@@ -91,7 +91,5 @@ mod tests {
 
         println!("not filter indices: {:?}", indices);
         println!("not filter distances: {:?}", distances);
-
-        // let (indices, distances) = hnsw_index.search_vectors(&[2.0; 10], 1, 10);
     }
 }
