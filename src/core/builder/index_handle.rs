@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::any::Any;
 use std::sync::Arc;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct IndexHandle {
     inner: Arc<dyn Any + Send + Sync>,
 }

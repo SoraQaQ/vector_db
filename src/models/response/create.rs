@@ -1,5 +1,5 @@
-use serde::Serialize;
 use crate::core::index_factory::IndexKey;
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct CreateResponse {

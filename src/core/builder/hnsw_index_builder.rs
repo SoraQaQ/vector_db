@@ -78,6 +78,7 @@ where
 mod tests {
     use super::*;
     use hnsw_rs::anndists::dist::DistL2;
+    use roaring::RoaringBitmap;
 
     #[test]
     fn test_hnsw_index_builder() {
@@ -96,7 +97,12 @@ mod tests {
 
         hnsw_index.insert_vectors(&[1.0; 10], 1).unwrap();
 
-        let (indices, distances) = hnsw_index.search_vectors(&[1.0; 10], 1, 10).unwrap();
+        let mut bitmap = RoaringBitmap::new();
+        bitmap.insert(1);
+
+        let (indices, distances) = hnsw_index
+            .search_vectors_filter(&[1.0; 10], 1, 10, |key| bitmap.contains(key))
+            .unwrap();
 
         assert_eq!(indices.len(), 1);
         assert_eq!(distances.len(), 1);

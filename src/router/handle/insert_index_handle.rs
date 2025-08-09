@@ -4,7 +4,7 @@ use validator::Validate;
 
 use crate::{
     core::{
-        index::{faiss_index::FaissIndex, hnsw_index::HnswIndex},
+        index::{faiss_index::FaissIndex, hnsw_index::HnswIndex, usearch_index::UsearchIndex},
         index_factory::{IndexType, global_index_factory},
     },
     error::app_error::AppError,
@@ -37,13 +37,19 @@ pub async fn insert_handler(
             let faiss_index = index.downcast_ref::<FaissIndex>().unwrap();
             faiss_index
                 .insert_vectors(&vectors, id)
-                .map_err(|e| AppError::FaissError(e))?;
+                .map_err(|e| AppError::FaissError(format!("faiss insert err: {e}")))?;
         }
         IndexType::HNSW => {
             let hnsw_index = index.downcast_ref::<HnswIndex<f32>>().unwrap();
             hnsw_index
                 .insert_vectors(&vectors, id.try_into().unwrap())
                 .map_err(|e| AppError::HnswError(e.to_string()))?;
+        }
+        IndexType::USEARCH => {
+            let usearch_index = index.downcast_ref::<UsearchIndex>().unwrap();
+            usearch_index
+                .insert_vectors(id, &vectors)
+                .map_err(|e| AppError::UsearchError(format!("usearch insert err: {e}")))?;
         }
         _ => return Err(AppError::UnsupportedIndexType(index_key)),
     };
@@ -67,6 +73,7 @@ mod tests {
     };
     use rstest::*;
     use tower::Service;
+    use usearch::IndexOptions;
 
     fn setup_test_app() -> Router {
         axum::Router::new().route("/insert", post(insert_handler))
@@ -102,6 +109,7 @@ mod tests {
             .filter_level(log::LevelFilter::Debug)
             .init();
 
+        let opt = IndexOptions::default();
         let factory = global_index_factory();
         factory
             .init(
@@ -109,6 +117,7 @@ mod tests {
                 index_key.dim,
                 1000,
                 index_key.metric_type,
+                opt.clone(),
             )
             .unwrap();
 

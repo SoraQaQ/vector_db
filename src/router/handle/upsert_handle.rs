@@ -48,6 +48,7 @@ mod tests {
     use axum::routing::post;
     use axum::{Router, body::Body, http::Request};
     use std::sync::Arc;
+    use usearch::IndexOptions;
 
     use crate::core::index_factory::{self, IndexKey, IndexType, MetricType};
     use axum::body::to_bytes;
@@ -88,8 +89,10 @@ mod tests {
             .filter_level(log::LevelFilter::Debug)
             .init();
 
+        let opt = IndexOptions::default();
+
         index_factory::global_index_factory()
-            .init(IndexType::FLAT, 3, 1000, MetricType::L2)
+            .init(IndexType::FLAT, 3, 1000, MetricType::L2, opt.clone())
             .unwrap();
 
         let request = setup_upsert_json(

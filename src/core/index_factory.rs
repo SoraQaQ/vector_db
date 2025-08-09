@@ -2,23 +2,23 @@ use crate::core::builder::{
     faiss_index_builder::FaissIndexBuilder,
     hnsw_index_builder::HnswIndexBuilder,
     index_handle::{IndexBuilder, IndexHandle},
+    usearch_index_builder::UsearchIndexBuilder,
 };
-use anyhow::Error;
+use anyhow::{Result, anyhow};
+use dashmap::DashMap;
 use faiss::MetricType as FaissMetricType;
 use hnsw_rs::anndists::dist::DistL2;
-use log::{info, warn};
+use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    fmt,
-    sync::{OnceLock, RwLock},
-};
+use std::{fmt, sync::OnceLock};
+use usearch::{IndexOptions, MetricKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum IndexType {
     FLAT = 0,
     HNSW = 1,
     UNKNOWN = -1,
+    USEARCH = 3,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
@@ -61,13 +61,14 @@ impl fmt::Display for IndexType {
         match self {
             IndexType::FLAT => write!(f, "FLAT"),
             IndexType::HNSW => write!(f, "HNSW"),
+            IndexType::USEARCH => write!(f, "USEARCH"),
             IndexType::UNKNOWN => write!(f, "UNKNOWN"),
         }
     }
 }
 
 pub struct IndexFactory {
-    index_map: RwLock<HashMap<IndexKey, IndexHandle>>,
+    index_map: DashMap<IndexKey, IndexHandle>,
 }
 
 impl IndexFactory {
@@ -77,7 +78,8 @@ impl IndexFactory {
         dim: u32,
         max_elements: usize,
         metric_type: MetricType,
-    ) -> Result<(), Error> {
+        mut usearch_options: IndexOptions,
+    ) -> Result<()> {
         info!("init index: {:?}", index_type);
         match index_type {
             IndexType::FLAT => {
@@ -92,7 +94,7 @@ impl IndexFactory {
 
                 let index = builder.build().unwrap();
 
-                self.index_map.write().unwrap().insert(
+                self.index_map.insert(
                     IndexKey {
                         index_type,
                         dim,
@@ -113,7 +115,7 @@ impl IndexFactory {
 
                     let index = builder.build().unwrap();
 
-                    self.index_map.write().unwrap().insert(
+                    self.index_map.insert(
                         IndexKey {
                             index_type,
                             dim,
@@ -124,13 +126,36 @@ impl IndexFactory {
 
                     Ok(())
                 }
-                _ => Err(Error::msg(format!(
-                    "Unknown metric type: {:?}",
-                    metric_type
-                ))),
+
+                _ => Err(anyhow!("Unknown metric type: {:?}", metric_type)),
             },
+            IndexType::USEARCH => {
+                match metric_type {
+                    MetricType::InnerProduct => {
+                        usearch_options.metric = MetricKind::IP;
+                    }
+                    MetricType::L2 => {
+                        usearch_options.metric = MetricKind::L2sq;
+                    }
+                }
+                usearch_options.dimensions = dim as usize;
+                let builder = UsearchIndexBuilder::new(usearch_options);
+                let index = builder.build().unwrap();
+
+                let index_key = IndexKey {
+                    index_type: index_type,
+                    dim: dim,
+                    metric_type: metric_type,
+                };
+
+                self.index_map.insert(index_key, index);
+
+                debug!("index_key: {:?}", index_key);
+
+                Ok(())
+            }
             _ => {
-                let err = Error::msg(format!("Unknown index type: {:?}", index_type));
+                let err = anyhow!("Unknown index type: {:?}", index_type);
                 warn!("{}", err);
                 Err(err)
             }
@@ -138,21 +163,23 @@ impl IndexFactory {
     }
 
     pub fn get_index(&self, index_key: IndexKey) -> Option<IndexHandle> {
-        self.index_map.read().unwrap().get(&index_key).cloned()
+        self.index_map.get(&index_key).map(|v| v.clone())
     }
 }
 
 pub fn global_index_factory() -> &'static IndexFactory {
     static INDEX_FACTORY: OnceLock<IndexFactory> = OnceLock::new();
     INDEX_FACTORY.get_or_init(|| IndexFactory {
-        index_map: RwLock::new(HashMap::new()),
+        index_map: DashMap::new(),
     })
 }
 
 #[cfg(test)]
 mod tests {
 
-    use crate::core::index::faiss_index::FaissIndex;
+    use usearch::{MetricKind, ScalarKind};
+
+    use crate::core::index::{faiss_index::FaissIndex, usearch_index::UsearchIndex};
 
     use super::*;
 
@@ -162,17 +189,33 @@ mod tests {
             .filter_level(log::LevelFilter::Debug)
             .init();
 
+        let opt = IndexOptions {
+            dimensions: 3,                 // necessary for most metric kinds
+            metric: MetricKind::IP,        // or ::L2sq, ::Cos ...
+            quantization: ScalarKind::F32, // or ::F32, ::F16, ::I8, ::B1x8 ...
+            connectivity: 0,               // zero for auto
+            expansion_add: 0,              // zero for auto
+            expansion_search: 0,           // zero for auto
+            multi: false,
+        };
+
         let index_factory = global_index_factory();
         index_factory
-            .init(IndexType::FLAT, 128, 1000, MetricType::L2)
+            .init(IndexType::FLAT, 128, 1000, MetricType::L2, opt.clone())
             .unwrap();
 
         index_factory
-            .init(IndexType::FLAT, 256, 1000, MetricType::L2)
+            .init(IndexType::FLAT, 256, 1000, MetricType::L2, opt.clone())
             .unwrap();
 
         index_factory
-            .init(IndexType::FLAT, 10, 1000, MetricType::InnerProduct)
+            .init(
+                IndexType::FLAT,
+                10,
+                1000,
+                MetricType::InnerProduct,
+                opt.clone(),
+            )
             .unwrap();
 
         let index = index_factory.get_index(IndexKey {
@@ -212,18 +255,24 @@ mod tests {
             FaissMetricType::InnerProduct
         );
 
+        let result = index_factory.init(IndexType::UNKNOWN, 128, 1000, MetricType::L2, opt.clone());
+        assert!(result.is_err());
+
         index_factory
-            .init(IndexType::UNKNOWN, 128, 1000, MetricType::L2)
+            .init(IndexType::USEARCH, 128, 1000, MetricType::L2, opt.clone())
             .unwrap();
 
-        // assert!(result.is_err());
-        // info!("error is {:?}", result.err().unwrap());
-        let unknown_index = index_factory.get_index(IndexKey {
-            index_type: IndexType::UNKNOWN,
+        let index = index_factory.get_index(IndexKey {
+            index_type: IndexType::USEARCH,
             dim: 128,
             metric_type: MetricType::L2,
         });
 
-        assert_eq!(unknown_index.is_none(), true);
+        debug!("usearch index: {:?}", index);
+
+        assert_eq!(
+            index.unwrap().downcast_ref::<UsearchIndex>().unwrap().dim(),
+            128
+        );
     }
 }

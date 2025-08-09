@@ -5,18 +5,18 @@ use crate::core::index_factory::IndexKey;
 
 #[derive(Debug, Error)]
 pub enum AppError {
-    // 通用错误
     #[error("Validation error: {0}")]
     ValidationError(String),
 
-    // 索引类型特定的错误
     #[error("Faiss error: {0}")]
-    FaissError(#[from] faiss::error::Error),
+    FaissError(String),
 
     #[error("Hnsw error: {0}")]
     HnswError(String),
 
-    // 索引管理错误
+    #[error("Usearch error: {0}")]
+    UsearchError(String),
+
     #[error("Index not found: {0}")]
     IndexNotFound(String),
 

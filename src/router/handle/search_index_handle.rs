@@ -1,10 +1,11 @@
 use axum::Json;
+use faiss::Idx;
 use log::info;
 use validator::Validate;
 
 use crate::{
     core::{
-        index::{faiss_index::FaissIndex, hnsw_index::HnswIndex},
+        index::{faiss_index::FaissIndex, hnsw_index::HnswIndex, usearch_index::UsearchIndex},
         index_factory::{IndexType, global_index_factory},
     },
     error::app_error::AppError,
@@ -12,30 +13,33 @@ use crate::{
 };
 
 struct SearchResult {
-    labels: Vec<i64>,
+    labels: Vec<u64>,
     distances: Vec<f32>,
 }
 
 impl SearchResult {
-    pub fn from_faiss(result: faiss::index::SearchResult) -> Result<Self, AppError> {
+    pub fn from_faiss(result: (Vec<Idx>, Vec<f32>)) -> Result<Self, AppError> {
         let labels = result
-            .labels
-            .iter()
-            .map(|x| x.get().map(|id| id as i64).unwrap_or(-1))
-            .collect::<Vec<i64>>();
-
-        Ok(SearchResult {
-            labels,
-            distances: result.distances,
-        })
+            .0
+            .into_iter()
+            .map(|x| x.get().unwrap())
+            .collect::<Vec<u64>>();
+        let distances = result.1;
+        Ok(SearchResult { labels, distances })
     }
 
     pub fn from_hnsw(result: (Vec<usize>, Vec<f32>)) -> Result<Self, AppError> {
-        let labels = result.0.iter().map(|x| *x as i64).collect::<Vec<i64>>();
+        let labels = result.0.iter().map(|x| *x as u64).collect::<Vec<u64>>();
         Ok(SearchResult {
             labels,
             distances: result.1,
         })
+    }
+
+    pub fn from_usearch(result: (Vec<u64>, Vec<f32>)) -> Result<Self, AppError> {
+        let labels = result.0;
+        let distances = result.1;
+        Ok(SearchResult { labels, distances })
     }
 }
 
@@ -66,7 +70,7 @@ pub async fn search_handler(
                 .downcast_ref::<FaissIndex>()
                 .unwrap()
                 .search_vectors(&vectors, k)
-                .map_err(|e| AppError::FaissError(e))?;
+                .map_err(|e| AppError::FaissError(format!("faiss search err: {e}")))?;
 
             SearchResult::from_faiss(result)?
         }
@@ -77,6 +81,14 @@ pub async fn search_handler(
                 .map_err(|e| AppError::HnswError(e.to_string()))?;
 
             SearchResult::from_hnsw(result)?
+        }
+
+        IndexType::USEARCH => {
+            let usearch_index = index.downcast_ref::<UsearchIndex>().unwrap();
+            let result = usearch_index
+                .search(&vectors, k)
+                .map_err(|e| AppError::UsearchError(format!("{e}")))?;
+            SearchResult::from_usearch(result)?
         }
         _ => return Err(AppError::UnsupportedIndexType(index_key)),
     };
@@ -100,6 +112,7 @@ mod tests {
     };
     use rstest::*;
     use tower::Service;
+    use usearch::IndexOptions;
 
     use super::*;
 
@@ -139,8 +152,11 @@ mod tests {
             .init();
 
         let factory = global_index_factory();
+
+        let opt = IndexOptions::default();
+
         factory
-            .init(IndexType::FLAT, 3, 1000, MetricType::L2)
+            .init(IndexType::FLAT, 3, 1000, MetricType::L2, opt.clone())
             .unwrap();
 
         let request = setup_search_json(vectors, k, index_key);
@@ -163,9 +179,11 @@ mod tests {
             .filter_level(log::LevelFilter::Debug)
             .init();
 
+        let opt = IndexOptions::default();
+
         let factory = global_index_factory();
         factory
-            .init(IndexType::HNSW, 3, 1000, MetricType::L2)
+            .init(IndexType::HNSW, 3, 1000, MetricType::L2, opt.clone())
             .unwrap();
 
         factory

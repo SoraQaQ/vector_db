@@ -5,7 +5,7 @@ use crate::{
     },
     db::scalar_storage::ScalarStorage,
 };
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use log::info;
 use rocksdb::DB;
 
@@ -25,7 +25,7 @@ impl VectorDatabase {
         info!("upsert data: {:?}", data);
         let index = global_index_factory()
             .get_index(index_key)
-            .ok_or_else(|| anyhow::anyhow!("index not found"))?;
+            .ok_or_else(|| anyhow!("index not found"))?;
 
         if self.scalar_storage.get_scalar(id).is_some() {
             match index_key.index_type {
@@ -37,21 +37,23 @@ impl VectorDatabase {
                     // let hnsw_index = index.downcast_ref::<HnswIndex<f32>>().unwrap();
                     info!("unimplemented");
                 }
+
                 IndexType::UNKNOWN => {
-                    return Err(anyhow::anyhow!("index type unknown"));
+                    return Err(anyhow!("index type unknown"));
                 }
+                _ => {}
             }
         }
 
         let new_vectors = data
             .get("vectors")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| anyhow::anyhow!("vectors field not found or not an array"))?
+            .ok_or_else(|| anyhow!("vectors field not found or not an array"))?
             .iter()
             .map(|v| {
                 v.as_f64()
                     .map(|x| x as f32)
-                    .ok_or_else(|| anyhow::anyhow!("vector element is not a number"))
+                    .ok_or_else(|| anyhow!("vector element is not a number"))
             })
             .collect::<Result<Vec<f32>>>()?;
 
@@ -67,8 +69,9 @@ impl VectorDatabase {
                 hnsw_index.insert_vectors(&new_vectors, id.try_into().unwrap())?;
             }
             IndexType::UNKNOWN => {
-                return Err(anyhow::anyhow!("index type unknown"));
+                return Err(anyhow!("index type unknown"));
             }
+            _ => {}
         }
 
         self.scalar_storage.insert_scalar(id, data)?;

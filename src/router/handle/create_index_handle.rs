@@ -1,5 +1,6 @@
 use axum::Json;
 use log::info;
+use usearch::IndexOptions;
 use validator::Validate;
 
 use crate::{
@@ -26,8 +27,10 @@ pub async fn create_handler(
 
     let index_factory = global_index_factory();
 
+    let opt = IndexOptions::default();
+
     index_factory
-        .init(index_type, dim, max_elements, metric_type)
+        .init(index_type, dim, max_elements, metric_type, opt.clone())
         .map_err(|e| {
             AppError::InitIndexError(
                 IndexKey {

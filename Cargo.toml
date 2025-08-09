@@ -20,3 +20,6 @@ rstest = "0.22.0"
 hnsw_rs = "0.3.2"
 rocksdb = { version = "0.23.0", features = ["multi-threaded-cf"]}
 tempfile = "3.20.0"
+roaring = "0.11.2"
+dashmap = "6.1.0"
+usearch = "2.19.1"
